@@ -39,7 +39,7 @@ getSplineCurve <- function(yieldCurve) {
   # This function takes a data frame of different single point rates at different maturities and fits a curve
   # Used to interpolate rates in between rates pulled from FRED (eg. incase we need a rate for 1.5Y maturity)
   
-  yieldFit <- stats::lm(rate ~ splines::bs(maturity, knots = (2,3,10), degree = 3))
+  yieldFit <- stats::lm(rate ~ splines::bs(maturity, knots = c(2,3,10), degree = 3), yieldCurve)
 
   return(yieldFit)
 }
@@ -68,7 +68,8 @@ bootsrapSpot <- function(parFit) {
   spotRates <- tibble(maturity = c(0.5),
                        spotRate = c(parYields$parRate[1]))
   
-  # Back out spot rates for every maturity, add to spotYields data frame. 
+  # Back out spot rates for every maturity, add to spotYields data frame.
+  
   for (mat in parYields$maturity[2:length(parYields$maturity)]) {
     
     # Par yields mean YTM = coupon rate
@@ -111,3 +112,4 @@ bootsrapSpot <- function(parFit) {
   }
   return(spotRates)
 }
+

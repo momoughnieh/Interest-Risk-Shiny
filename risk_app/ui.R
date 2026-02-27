@@ -15,7 +15,7 @@ page_navbar(
   id = "navbar1",
   theme = bs_theme(bootswatch = "flatly"),
   sidebar = sidebar(
-    selectInput("coupon_rate_pick", "Select Coupoon Rate", "coupon_rate_data"),
+    selectInput("coupon_rate_pick", "Select Coupon Rate", "coupon_rate_data"),
     numericInput("time_to_maturity_input", "Select Time to Maturity (days)", value = 0, min = 0),
     selectInput("payment_frequency_pick", "Select Payment Frequency", c("Semi-Annual", "Annual", "Quarterly", "Zero-Coupon"))
     ),

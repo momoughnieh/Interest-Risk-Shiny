@@ -48,7 +48,7 @@ getSplineCurve <- function(yieldCurve) {
   return(yieldFit)
 }
 
-bootsrapSpot <- function(parFit) {
+bootsrapSpot <- function(parFit, yieldCurve) {
   # Bootstrap spot yields #
 
   # Price at par is 100
@@ -113,6 +113,21 @@ bootsrapSpot <- function(parFit) {
 
     spotRates <- rbind(spotRates, tempdf)
   }
+  
+  shortTermRates <- yieldCurve %>%
+    dplyr::filter(maturity < 0.5) %>%
+    dplyr::rename(spotRate = rate) %>%
+    dplyr::select(-date)
+  
+  spotRates <- rbind(spotRates, shortTermRates) %>%
+    arrange(maturity)
+  
+  uniqueMaturities <- yieldCurve %>%
+    dplyr::pull(maturity)
+  
+  spotRates <- spotRates %>%
+    dplyr::filter(maturity %in% uniqueMaturities)
+  
   return(spotRates)
 }
 

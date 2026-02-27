@@ -7,7 +7,10 @@ library(RTL)
 library(tidyquant)
 library(dplyr)
 library(splines)
-
+library(ggcorrplot)
+library(factoextra)
+library(recipes)
+library(tidyverse)
 
 # Goal: Figure out how to pull data through github actions, and then read data in app.
 
@@ -40,7 +43,7 @@ getSplineCurve <- function(yieldCurve) {
   # This function takes a data frame of different single point rates at different maturities and fits a curve
   # Used to interpolate rates in between rates pulled from FRED (eg. incase we need a rate for 1.5Y maturity)
 
-  yieldFit <- stats::lm(rate ~ splines::bs(maturity, knots = (2,3,10), degree = 3))
+  yieldFit <- stats::lm(rate ~ splines::bs(maturity, knots = c(2,3,10), degree = 3))
 
   return(yieldFit)
 }
@@ -112,3 +115,21 @@ bootsrapSpot <- function(parFit) {
   }
   return(spotRates)
 }
+
+# Step 1：ret = price - lag(price)
+ir.long <- rateData %>%
+  dplyr::group_by(maturity) %>%
+  dplyr::arrange(date) %>%
+  dplyr::mutate(ret = rate - dplyr::lag(rate)) %>%   # 课本: ret = price - lag(price)
+  stats::na.omit() %>%
+  dplyr::ungroup()
+
+# Step 2:pivot_wider
+ir.wide <- ir.long %>%
+  tidyr::pivot_wider(
+    id_cols    = date,
+    names_from = maturity,
+    values_from = ret
+  ) %>%
+  stats::na.omit()
+

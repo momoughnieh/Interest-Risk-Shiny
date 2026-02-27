@@ -12,17 +12,47 @@ library(shiny)
 # Define server logic required to draw a histogram
 function(input, output, session) {
 
-    output$distPlot <- renderPlot({
+  output$calculator_button <- renderUI({
+    actionButton("calculator_button","To Calculator")
+  })
+  output$info_button <- renderUI({
+    actionButton("info_button","To Info")
+  })
 
-        # generate bins based on input$bins from ui.R
-        x    <- faithful[, 2]
-        bins <- seq(min(x), max(x), length.out = input$bins + 1)
+  plot_data <- reactive({
+    rates_data_clean %>%
+      filter(symbol == "DGS10") %>%
+      filter(!is.na(price))
+  })
 
-        # draw the histogram with the specified number of bins
-        hist(x, breaks = bins, col = 'darkgray', border = 'white',
-             xlab = 'Waiting time to next eruption (in mins)',
-             main = 'Histogram of waiting times')
-
+    output$example_plot <- renderPlot({
+      ggplot(plot_data(), aes(x = date, y = price)) +
+        geom_line(color = "#2c7bb6", linewidth = 0.7) +
+        labs(
+          title = "10-Year Treasury Yield Over Time",
+          x     = "Date",
+          y     = "Yield (%)"
+        ) +
+        theme_minimal()
     })
 
+    output$example_table <- renderTable({
+      plot_data() %>%
+        select(Date = date, `Yield (%)` = price) %>%
+        arrange(desc(Date)) %>%
+        head(20)
+    })
+
+
+
+
+
+  observeEvent(input$calculator_button, {
+    nav_select("navbar1", selected = "Calculator")
+  })
+  observeEvent(input$info_button, {
+    nav_select("navbar1", selected = "General Info")
+  })
 }
+
+

@@ -25,7 +25,7 @@ page_navbar(
       card_header("Example Graph"),
       plotOutput("example_plot")
     ),
-    card(
+    fluidRow(
       uiOutput("calculator_button")
     )
   ),
@@ -35,7 +35,7 @@ page_navbar(
       card_header ("Example Table"),
       tableOutput("example_table")
     ),
-    card(
+    fluidRow(
       uiOutput("info_button")
     )
   )

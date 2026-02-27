@@ -20,13 +20,12 @@ function(input, output, session) {
   })
 
   plot_data <- reactive({
-    rates_data_clean %>%
-      filter(symbol == "DGS10") %>%
-      filter(!is.na(price))
+    rateData %>%
+      filter(maturity == 10)
   })
 
     output$example_plot <- renderPlot({
-      ggplot(plot_data(), aes(x = date, y = price)) +
+      ggplot(plot_data(), aes(x = date, y = rate)) +
         geom_line(color = "#2c7bb6", linewidth = 0.7) +
         labs(
           title = "10-Year Treasury Yield Over Time",
@@ -38,7 +37,7 @@ function(input, output, session) {
 
     output$example_table <- renderTable({
       plot_data() %>%
-        select(Date = date, `Yield (%)` = price) %>%
+        select(Date = date, `Yield (%)` = rate) %>%
         arrange(desc(Date)) %>%
         head(20)
     })

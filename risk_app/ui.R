@@ -38,8 +38,12 @@ page_navbar(
     fluidRow(
       uiOutput("info_button")
     )
+  ),nav_panel(
+    title = "Co-Dynamics",
+    plotOutput("corrPlot"),
+    plotOutput("screePlot"),
+    plotOutput("loadingsPlot")
   )
-  )
-
+)
 
 

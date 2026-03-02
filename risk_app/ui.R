@@ -30,6 +30,13 @@ page_navbar(
     )
   ),
   nav_panel(
+    title = "Portfolio Selection",
+    fluidRow(
+      selectInput("number_of_bonds", "Select Number of Bonds in Portfolio", c(1,2,3,4,5,6)),
+      uiOutput("bond_inputs")
+    )
+  ),
+  nav_panel(
     title = "Calculator",
     card(
       card_header ("Example Table"),

@@ -42,7 +42,39 @@ function(input, output, session) {
         head(20)
     })
 
+    output$bond_inputs <- renderUI({
+      n <- as.integer(input$number_of_bonds)
 
+      bond_rows <- lapply(1:n, function(i) {
+        fluidRow(
+          column(12, h5(paste("Bond", i))),
+          column(4,
+                 selectInput(
+                   inputId  = paste0("coupon_rate_", i),
+                   label    = paste("Bond", i, "- Coupon Rate"),
+                   choices  = c(1,2,3,4)
+                 )
+          ),
+          column(4,
+                 numericInput(
+                   inputId = paste0("time_to_maturity_", i),
+                   label   = paste("Bond", i, "- Time to Maturity (days)"),
+                   value   = 0,
+                   min     = 0
+                 )
+          ),
+          column(4,
+                 selectInput(
+                   inputId = paste0("payment_frequency_", i),
+                   label   = paste("Bond", i, "- Payment Frequency"),
+                   choices = c("Semi-Annual", "Annual", "Quarterly", "Zero-Coupon")
+                 )
+          )
+        )
+      })
+
+      tagList(bond_rows)
+    })
 
 
 

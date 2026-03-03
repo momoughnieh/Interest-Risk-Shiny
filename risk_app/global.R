@@ -39,6 +39,8 @@ grabRates <- function() {
 
 rateData <- grabRates()
 
+## Spline Curve function -- to be used on par yields to bootstrap zero curve ##
+
 getSplineCurve <- function(yieldCurve) {
 
   # This function takes a data frame of different single point rates at different maturities and fits a curve
@@ -48,6 +50,95 @@ getSplineCurve <- function(yieldCurve) {
 
   return(yieldFit)
 }
+
+## Get spline for spot ##
+## This function is used to interpolate spot rates specific to a particular bond ##
+## Purpose: Spline once so that we can adequately observe shock effects on particular yields. Shocking & re-splining changes rates we don't intend to shock ##
+
+getsplineSpot <- function(mat, freq, spots) {
+  
+  splineFit <- stats::lm(rate ~ splines::bs(maturity, knots = c(2,3,10), degree = 3), spots)
+  
+  maturities <- data.frame(
+    maturity = seq(1 / freq, mat, by = 1 / freq))
+    
+  rates <- splineFit %>% stats::predict(
+    newdata = maturities
+  ) %>%
+    unname(.)
+    
+  spotCurve <- tibble(maturity = maturities$maturity,
+                      rate = rates)
+  
+  return(spotCurve) # This is to be fed into the bond pricing function
+  
+}
+
+## Function to price specific bonds ##
+## Inputs: face value, coupon rate, maturity, payment frequency, and the appropriate spot rates given the payment periods ##
+
+priceBond <- function(faceVal, C, mat, freq, spotRates) {
+  
+  pricingTable <- tibble(maturity = spotRates$maturity[-length(spotRates$maturity)],
+                         cashFlow = ((C * faceVal) / freq),
+                         rate = spotRates$rate[-length(spotRates$rate)])
+  
+  lastRowCF <- tibble(maturity = spotRates$maturity[lnegth(spotRates$maturity)],
+                      cashFlow = faceVal + ((C * faceVal) / freq),
+                      rate = spotRates$rate[length(spotRates$rate)])
+  
+  pricingTable <- bind_rows(pricingTable, lastRowCF) %>%
+    dplyr::mutate(discFactor = (1 / (1 + (rate / freq))^(maturity*freq))) %>%
+    dplyr::mutate(cashFlowPV = cashFlow * discFactor)
+  
+  finalPrice <- sum(pricingTable$cashFlowPV)
+  
+  return(finalPrice)
+}
+
+# This function comptues the sensitivites WITHIN a specific bond to each key spot rate
+
+computeKeySens <- function(spotCurve, bondInfo) {
+  
+  stepSize = 0.0001 # 1 BP sensitivity
+  
+  faceVal <- bondInfo[1]
+  couponRate <- bondInfo[2]
+  maturity <- bondInfo[3]
+  frequency <- bondInfo[4]
+  
+  priceUps <- c() 
+  priceDowns <- c()
+  
+  for (row in 1:nrow(spotCurve)) {
+    
+    shockedUp <- spotCurve
+    shockedUp[row, 2] <- shockedUp[row, 2] + stepSize
+    
+    shockedDown <- spotCurve
+    shockedDown[row, 2] <- shockedDown[row, 2] - stepSize
+    
+    priceUp <- priceBond(faceVal, couponRate, maturity, frequency, shockedUp)
+    priceDown <- priceBond(faceVal, couponRate, maturity, frequency, shockedDown)
+  }
+  
+  # So far: Only delta calculations. Will amend later for gamma.
+  
+  sensTibble <- spotCurve %>%
+    dplyr::select(-rate) %>%
+    dplyr::mutate(priceUp = priceUps,
+                  pricedown = priceDowns) %>%
+    dplyr::mutate(delta = ((priceUp - priceDown) / (2 * stepSize)) / 10000) %>%
+    dplyr::select(-c(priceUp, priceDown))
+  
+  return(sensTibble) 
+  
+}
+
+
+
+
+
 
 bootsrapSpot <- function(parFit, yieldCurve) {
   # Bootstrap spot yields #

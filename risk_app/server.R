@@ -11,37 +11,37 @@ library(shiny)
 
 # Define server logic required to draw a histogram
 function(input, output, session) {
-
+  
   output$calculator_button <- renderUI({
     actionButton("calculator_button","To Calculator")
   })
   output$info_button <- renderUI({
     actionButton("info_button","To Info")
   })
-
+  
   plot_data <- reactive({
     rateData %>%
       filter(maturity == 10)
   })
-
-    output$example_plot <- renderPlot({
-      ggplot(plot_data(), aes(x = date, y = rate)) +
-        geom_line(color = "#2c7bb6", linewidth = 0.7) +
-        labs(
-          title = "10-Year Treasury Yield Over Time",
-          x     = "Date",
-          y     = "Yield (%)"
-        ) +
-        theme_minimal()
-    })
-
-    output$example_table <- renderTable({
-      plot_data() %>%
-        select(Date = date, `Yield (%)` = rate) %>%
-        arrange(desc(Date)) %>%
-        head(20)
-    })
-
+  
+  output$example_plot <- renderPlot({
+    ggplot(plot_data(), aes(x = date, y = rate)) +
+      geom_line(color = "#2c7bb6", linewidth = 0.7) +
+      labs(
+        title = "10-Year Treasury Yield Over Time",
+        x     = "Date",
+        y     = "Yield (%)"
+      ) +
+      theme_minimal()
+  })
+  
+  output$example_table <- renderTable({
+    plot_data() %>%
+      select(Date = date, `Yield (%)` = rate) %>%
+      arrange(desc(Date)) %>%
+      head(20)
+  })
+  
   portfolio <- reactiveVal(
     tibble(
       "bond_id" = numeric(),
@@ -49,17 +49,32 @@ function(input, output, session) {
       "coupon" = numeric(),
       "maturity" = numeric(),
       "freq" = numeric(),
+      "pv" = numeric()
     )
   )
   
   addBond <- reactive({
-    
     entirePortfolio <- portfolio()
     
     faceValue <- input$face_value
     couponRate <- input$coupon_rate
     maturity <- input$time_to_maturity
     frequency <- input$payment_frequency
+    
+    freqInput <- ifelse(frequency == "Semi-Annual", 2, ifelse(frequency == "Zero-Coupon", 0, 1))
+    
+    lastDate <- rateData %>%
+      tail(., n = 1L) %>%
+      dplyr::pull(date)
+    
+    parCurve <- rateData %>%
+      dplyr::filter(date == lastDate)
+    
+    fitPar <- getSplineCurve(parCurve)
+    spotsKey <- bootstrapSpot(fitPar, parCurve)
+    spots <- getSplineSpot(maturity, freqInput, spotsKey)
+    
+    bondPrice <- priceBond(faceValue, (couponRate / 100), maturity, freqInput, spots)
     
     bond_ids <- entirePortfolio$bond_id
     
@@ -70,7 +85,8 @@ function(input, output, session) {
       "bond_id" = bond_id,
       "coupon" = couponRate,
       "maturity" = maturity,
-      "freq" = frequency
+      "freq" = frequency,
+      "pv" = bondPrice
     ) %>%
       dplyr::mutate(freq = case_when(
         freq == "Annual" ~ 1,
@@ -101,7 +117,7 @@ function(input, output, session) {
       portfolioTable,
       caption = "Portfolio Composition",
       rownames = FALSE,
-      colnames = c("Bond ID", "Face Value ($)", "Coupon Rate (%)", "Time to Maturity (years)", "Payment Frequency"),
+      colnames = c("Bond ID", "Face Value ($)", "Coupon Rate (%)", "Time to Maturity (years)", "Payment Frequency", "Bond Value ($)"),
       width = "150px",
       options = list(
         dom = "t",
@@ -128,7 +144,7 @@ function(input, output, session) {
     recipes::step_scale(all_numeric()) %>%
     recipes::step_pca(all_numeric(), num_comp = 3) %>%
     recipes::prep(training = ir.wide)
-
+  
   output$corrPlot <- renderPlot({
     ir.wide %>%
       dplyr::select(-date) %>%
@@ -140,14 +156,14 @@ function(input, output, session) {
         lab    = TRUE
       )
   })
-
+  
   output$screePlot <- renderPlot({
     ir.wide %>%
       dplyr::select(-date) %>%
       stats::prcomp(scale = TRUE, center = TRUE) %>%
       factoextra::fviz_eig(choice = "variance", addlabels = TRUE, ncp = 11)
   })
-
+  
   output$loadingsPlot <- renderPlot({
     tidy(pca_estimates, number = 3) %>%
       dplyr::filter(component %in% c("PC1", "PC2", "PC3")) %>%
@@ -158,9 +174,7 @@ function(input, output, session) {
            x = "Maturity (Years)", y = "Loading") +
       theme_minimal()
   })
-
-
-
+  
+  
+  
 }
-
-

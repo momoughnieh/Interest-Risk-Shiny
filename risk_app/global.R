@@ -17,15 +17,15 @@ library(DT)
 
 grabRates <- function() {
   rateTickers <- c("DGS1MO", "DGS3MO", "DGS6MO", "DGS1", "DGS2", "DGS3", "DGS5", "DGS7", "DGS10", "DGS20", "DGS25", "DGS30")
-
+  
   # Pull data
   rateDat <- rateTickers %>%
     tq_get(get = "economic.data",
            from = "1992-01-01",
            to = Sys.Date())
-
+  
   # Clean data
-
+  
   rateDat <- rateDat %>%
     tidyr::drop_na() %>%
     dplyr::mutate(price = price / 100) %>%
@@ -33,7 +33,7 @@ grabRates <- function() {
     dplyr::mutate(maturityChar = str_extract(symbol, "\\d+.*")) %>%
     dplyr::mutate(maturity = ifelse(str_detect(maturityChar, "MO"), as.numeric(str_extract(maturityChar, "\\d")) / 12, as.numeric(maturityChar))) %>%
     dplyr::select(-maturityChar, -symbol)
-
+  
   return(rateDat)
 }
 
@@ -42,12 +42,12 @@ rateData <- grabRates()
 ## Spline Curve function -- to be used on par yields to bootstrap zero curve ##
 
 getSplineCurve <- function(yieldCurve) {
-
+  
   # This function takes a data frame of different single point rates at different maturities and fits a curve
   # Used to interpolate rates in between rates pulled from FRED (eg. incase we need a rate for 1.5Y maturity)
-
-  yieldFit <- stats::lm(rate ~ splines::bs(maturity, knots = c(2,3,10), degree = 3))
-
+  
+  yieldFit <- stats::lm(rate ~ splines::bs(maturity, knots = c(2,3,10), degree = 3), yieldCurve)
+  
   return(yieldFit)
 }
 
@@ -55,18 +55,18 @@ getSplineCurve <- function(yieldCurve) {
 ## This function is used to interpolate spot rates specific to a particular bond ##
 ## Purpose: Spline once so that we can adequately observe shock effects on particular yields. Shocking & re-splining changes rates we don't intend to shock ##
 
-getsplineSpot <- function(mat, freq, spots) {
+getSplineSpot <- function(mat, freq, spots) {
   
-  splineFit <- stats::lm(rate ~ splines::bs(maturity, knots = c(2,3,10), degree = 3), spots)
+  splineFit <- stats::lm(spotRate ~ splines::bs(maturity, knots = c(2,3,10), degree = 3), spots)
   
   maturities <- data.frame(
     maturity = seq(1 / freq, mat, by = 1 / freq))
-    
+  
   rates <- splineFit %>% stats::predict(
     newdata = maturities
   ) %>%
     unname(.)
-    
+  
   spotCurve <- tibble(maturity = maturities$maturity,
                       rate = rates)
   
@@ -77,21 +77,21 @@ getsplineSpot <- function(mat, freq, spots) {
 ## Function to price specific bonds ##
 ## Inputs: face value, coupon rate, maturity, payment frequency, and the appropriate spot rates given the payment periods ##
 
-priceBond <- function(faceVal, C, mat, freq, spotRates) {
+priceBond <- function(faceVal, C, mat, freq, spotRate) {
   
-  pricingTable <- tibble(maturity = spotRates$maturity[-length(spotRates$maturity)],
-                         cashFlow = ((C * faceVal) / freq),
-                         rate = spotRates$rate[-length(spotRates$rate)])
+  pricingTable <- tibble(maturity = spotRate$maturity[-length(spotRate$maturity)],
+                         cashFlow = ((C * faceVal) / 2),
+                         rate = spotRate$rate[-length(spotRate$rate)])
   
-  lastRowCF <- tibble(maturity = spotRates$maturity[lnegth(spotRates$maturity)],
-                      cashFlow = faceVal + ((C * faceVal) / freq),
-                      rate = spotRates$rate[length(spotRates$rate)])
+  lastRowCF <- tibble(maturity = spotRate$maturity[length(spotRate$maturity)],
+                      cashFlow = faceVal + ((C * faceVal) / 2),
+                      rate = spotRate$rate[length(spotRate$rate)])
   
   pricingTable <- bind_rows(pricingTable, lastRowCF) %>%
     dplyr::mutate(discFactor = (1 / (1 + (rate / freq))^(maturity*freq))) %>%
     dplyr::mutate(cashFlowPV = cashFlow * discFactor)
   
-  finalPrice <- sum(pricingTable$cashFlowPV)
+  finalPrice <- round(sum(pricingTable$cashFlowPV), 2)
   
   return(finalPrice)
 }
@@ -136,45 +136,41 @@ computeKeySens <- function(spotCurve, bondInfo) {
 }
 
 
-
-
-
-
-bootsrapSpot <- function(parFit, yieldCurve) {
+bootstrapSpot <- function(parFit, yieldCurve) {
   # Bootstrap spot yields #
-
+  
   # Price at par is 100
-
+  
   parPrice <- 100
-
+  
   # Assuming 1, 3, and 6 month par yields are equal to spot (no coupons)
-
+  
   all_maturities <- data.frame(
     maturity = seq(0.5, 30, by = 0.5)
   )
-
+  
   # Generate par yields for all coupon payment dates
   parRates <- parFit %>%
     stats::predict(newdata = all_maturities) %>%
     unname(.)
-
+  
   parYields <- tibble(maturity = seq(0.5, 30, by = 0.5),
                       parRate = parRates)
-
+  
   spotRates <- tibble(maturity = c(0.5),
-                       spotRate = c(parYields$parRate[1]))
-
+                      spotRate = c(parYields$parRate[1]))
+  
   # Back out spot rates for every maturity, add to spotYields data frame.
   for (mat in parYields$maturity[2:length(parYields$maturity)]) {
-
+    
     # Par yields mean YTM = coupon rate
     couponRate <- parYields %>%
       dplyr::filter(maturity == mat) %>%
       dplyr::pull(parRate)
-
+    
     # Coupon payment amount
     couponAmt = (couponRate * parPrice) / 2
-
+    
     # Pull available spot rates with respective maturities to discount coupon payments
     spotrates <- spotRates %>%
       dplyr::filter(maturity < mat) %>%
@@ -182,27 +178,27 @@ bootsrapSpot <- function(parFit, yieldCurve) {
     maturities <- spotRates %>%
       dplyr::filter(maturity < mat) %>%
       dplyr::pull(maturity)
-
+    
     # Calculate vector of discount factors for every coupon date
     discFactors <- (1 / (1 + spotrates / 2)^(2*maturities))
-
+    
     sumDiscFactors <- sum(discFactors)
-
+    
     # Present value of coupons
     pvCoupons <- couponAmt * sumDiscFactors
-
+    
     # Back out spot rate from final payment (principal + coupon)
     # Breaking apart & rearrange formula to solve for spot rate algebraically.
-
+    
     finalTermDiscFactor <- (parPrice - pvCoupons) / (parPrice + couponAmt)
-
+    
     newSpotRate <- 2 * ((finalTermDiscFactor^(-1/(mat * 2))) - 1)
-
+    
     # Bind to dataframe before next iteration
-
+    
     tempdf <- tibble(maturity = mat,
                      spotRate = newSpotRate)
-
+    
     spotRates <- rbind(spotRates, tempdf)
   }
   
@@ -244,4 +240,3 @@ ir.wide <- ir.long %>%
     values_from = ret
   ) %>%
   stats::na.omit()
-

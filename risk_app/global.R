@@ -219,6 +219,23 @@ bootstrapSpot <- function(parFit, yieldCurve) {
   return(spotRates)
 }
 
+lastDate <- rateData %>%
+  tail(., n = 1L) %>%
+  dplyr::pull(date)
+
+dayBefore <- rateData %>%
+  tail(., n = 2L) %>% 
+  dplyr::slice(1) %>%
+  dplyr::pull(date)
+
+
+
+parCurve <- rateData %>%
+  dplyr::filter(date == lastDate)
+
+fitPar <- getSplineCurve(parCurve)
+spotsKey <- bootstrapSpot(fitPar, parCurve)
+
 # Function to compute key rate deltas (bond-by-bond basis)
 # Parameters: spotCurve, vector of (coupon, T2M, freq)
 

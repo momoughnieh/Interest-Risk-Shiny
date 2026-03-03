@@ -50,11 +50,13 @@ function(input, output, session) {
       "maturity" = numeric(),
       "freq" = numeric(),
       "pv" = numeric()
+      # "spotCurve" = list()
     )
   )
   
   addBond <- reactive({
     entirePortfolio <- portfolio()
+    req(nrow(entirePortfolio) < 6)
     
     faceValue <- input$face_value
     couponRate <- input$coupon_rate
@@ -63,15 +65,16 @@ function(input, output, session) {
     
     freqInput <- ifelse(frequency == "Semi-Annual", 2, ifelse(frequency == "Zero-Coupon", 0, 1))
     
-    lastDate <- rateData %>%
-      tail(., n = 1L) %>%
-      dplyr::pull(date)
+    # lastDate <- rateData %>%
+    #   tail(., n = 1L) %>%
+    #   dplyr::pull(date)
+    # 
+    # parCurve <- rateData %>%
+    #   dplyr::filter(date == lastDate)
     
-    parCurve <- rateData %>%
-      dplyr::filter(date == lastDate)
+    # fitPar <- getSplineCurve(parCurve)
+    # spotsKey <- bootstrapSpot(fitPar, parCurve)
     
-    fitPar <- getSplineCurve(parCurve)
-    spotsKey <- bootstrapSpot(fitPar, parCurve)
     spots <- getSplineSpot(maturity, freqInput, spotsKey)
     
     bondPrice <- priceBond(faceValue, (couponRate / 100), maturity, freqInput, spots)
@@ -86,7 +89,7 @@ function(input, output, session) {
       "coupon" = couponRate,
       "maturity" = maturity,
       "freq" = frequency,
-      "pv" = bondPrice
+      "pv" = bondPrice,
     ) %>%
       dplyr::mutate(freq = case_when(
         freq == "Annual" ~ 1,
@@ -105,20 +108,61 @@ function(input, output, session) {
     portfolio(addBond())
   })
   
+  ## Remove selected bonds
+  
+  removeBonds <- reactive({
+    entirePortfolio <- portfolio()
+    
+    rowsRemove <- input$bond_table_rows_selected
+    
+    entirePortfolio <- entirePortfolio %>%
+      dplyr::filter(!bond_id %in% rowsRemove)
+  }) %>%
+    bindEvent(input$clear_selected_bonds)
+  
+  
+  observeEvent(input$clear_selected_bonds, {
+    portfolio(removeBonds())
+  })
+  
+  ##
+  
+  ## Remove all bonds
+  
+  removeAllBonds <- reactive({
+    entirePortfolio <- portfolio()
+    
+    entirePortfolio <- tibble("bond_id" = numeric(),
+                              "face_value" = numeric(),
+                              "coupon" = numeric(),
+                              "maturity" = numeric(),
+                              "freq" = numeric(),
+                              "pv" = numeric())
+  }) %>%
+    bindEvent(input$clear_portfolio)
+  
+  observeEvent(input$clear_portfolio, {
+    portfolio(removeAllBonds())
+  })
+  
+  ##
+  
   output$bond_table <- renderDT({
     portfolioTable <- portfolio() %>%
       dplyr::mutate(freq = case_when(
         freq == 1 ~ "Annual",
         freq == 2 ~ "Semi-Annual",
         freq == 0 ~ "Zero-Coupon"
-      ))
+      )) %>%
+      dplyr::select(-bond_id)
     
     DT::datatable(
       portfolioTable,
       caption = "Portfolio Composition",
       rownames = FALSE,
-      colnames = c("Bond ID", "Face Value ($)", "Coupon Rate (%)", "Time to Maturity (years)", "Payment Frequency", "Bond Value ($)"),
+      colnames = c("Face Value ($)", "Coupon Rate (%)", "Time to Maturity (years)", "Payment Frequency", "Bond Value ($)"),
       width = "150px",
+      selection = "multiple", 
       options = list(
         dom = "t",
         scrollY = "200px",
@@ -128,6 +172,17 @@ function(input, output, session) {
         
       )
     )
+  })
+  
+  observe({
+    print(names(input))
+    print(input$bond_table_rows_selected)
+  })
+  
+  output$clear_selected_ui <- renderUI({
+    req(input$bond_table_rows_selected > 0)
+    
+    actionButton(inputId = "clear_selected_bonds", label = "Clear Selected Bond(s)")
   })
   
   observeEvent(input$calculator_button, {

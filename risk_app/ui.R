@@ -33,9 +33,13 @@ page_navbar(
         numericInput(inputId = "time_to_maturity", label = "Time to Maturity (years)", min = 0.083, max = 30, value = 10),
         selectInput(inputId = "payment_frequency", label = "Coupon Payment Frequency", choices = c("Annual", "Semi-Annual", "Zero-Coupon"), selected = "Semi-Annual"),
         actionButton(inputId = "add_bond", label = "Add Bond to Portfolio"),
+        actionButton(inputId = "clear_portfolio", label = "Clear Portfolio"),
+        uiOutput(outputId = "clear_selected_ui"),
+        actionButton(inputId = "submit_portfolio", label = "Submit Portfolio", class = "btn-success"),
         open = "always"
       ),
       column(width = 12,
+             h4("Portfolio Assets (max. 6)"),
              DTOutput("bond_table")
       ))
   ),

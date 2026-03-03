@@ -42,48 +42,86 @@ function(input, output, session) {
         head(20)
     })
 
-    output$bond_inputs <- renderUI({
-      n <- as.integer(input$number_of_bonds)
-
-      bond_rows <- lapply(1:n, function(i) {
-        fluidRow(
-          column(12, h5(paste("Bond", i))),
-          column(4,
-                 selectInput(
-                   inputId  = paste0("coupon_rate_", i),
-                   label    = paste("Bond", i, "- Coupon Rate"),
-                   choices  = c(1,2,3,4)
-                 )
-          ),
-          column(4,
-                 numericInput(
-                   inputId = paste0("time_to_maturity_", i),
-                   label   = paste("Bond", i, "- Time to Maturity (days)"),
-                   value   = 0,
-                   min     = 0
-                 )
-          ),
-          column(4,
-                 selectInput(
-                   inputId = paste0("payment_frequency_", i),
-                   label   = paste("Bond", i, "- Payment Frequency"),
-                   choices = c("Semi-Annual", "Annual", "Quarterly", "Zero-Coupon")
-                 )
-          )
+  portfolio <- reactiveVal(
+    tibble(
+      "bond_id" = numeric(),
+      "face_value" = numeric(),
+      "coupon" = numeric(),
+      "maturity" = numeric(),
+      "freq" = numeric(),
+    )
+  )
+  
+  addBond <- reactive({
+    
+    entirePortfolio <- portfolio()
+    
+    faceValue <- input$face_value
+    couponRate <- input$coupon_rate
+    maturity <- input$time_to_maturity
+    frequency <- input$payment_frequency
+    
+    bond_ids <- entirePortfolio$bond_id
+    
+    bond_id <- ifelse(length(bond_ids) != 0, bond_ids[length(bond_ids)] + 1, 1)
+    
+    tempTibble <- tibble(
+      "face_value" = faceValue,
+      "bond_id" = bond_id,
+      "coupon" = couponRate,
+      "maturity" = maturity,
+      "freq" = frequency
+    ) %>%
+      dplyr::mutate(freq = case_when(
+        freq == "Annual" ~ 1,
+        freq == "Semi-Annual" ~ 2,
+        freq == "Zero-Coupon" ~ 0
+      ))
+    
+    entirePortfolio <- bind_rows(entirePortfolio, tempTibble)
+    
+    return(entirePortfolio)
+    
+  }) %>%
+    bindEvent(input$add_bond)
+  
+  observeEvent(input$add_bond, {
+    portfolio(addBond())
+  })
+  
+  output$bond_table <- renderDT({
+    portfolioTable <- portfolio() %>%
+      dplyr::mutate(freq = case_when(
+        freq == 1 ~ "Annual",
+        freq == 2 ~ "Semi-Annual",
+        freq == 0 ~ "Zero-Coupon"
+      ))
+    
+    DT::datatable(
+      portfolioTable,
+      caption = "Portfolio Composition",
+      rownames = FALSE,
+      colnames = c("Bond ID", "Face Value ($)", "Coupon Rate (%)", "Time to Maturity (years)", "Payment Frequency"),
+      width = "150px",
+      options = list(
+        dom = "t",
+        scrollY = "200px",
+        columnDefs = list(
+          list(className = "dt-center", targets = "_all")
         )
-      })
-
-      tagList(bond_rows)
-    })
-
-
-
+        
+      )
+    )
+  })
+  
   observeEvent(input$calculator_button, {
     nav_select("navbar1", selected = "Calculator")
   })
   observeEvent(input$info_button, {
     nav_select("navbar1", selected = "General Info")
   })
+  
+  
   pca_estimates <- ir.wide %>%
     recipes::recipe(~ .) %>%
     recipes::step_center(all_numeric()) %>%

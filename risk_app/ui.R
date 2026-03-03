@@ -14,11 +14,6 @@ page_navbar(
   title = "Portfolio Risk Calculator",
   id = "navbar1",
   theme = bs_theme(bootswatch = "flatly"),
-  sidebar = sidebar(
-    selectInput("coupon_rate_pick", "Select Coupoon Rate", "coupon_rate_data"),
-    numericInput("time_to_maturity_input", "Select Time to Maturity (days)", value = 0, min = 0),
-    selectInput("payment_frequency_pick", "Select Payment Frequency", c("Semi-Annual", "Annual", "Quarterly", "Zero-Coupon"))
-    ),
   nav_panel(
     title = "General Info",
     card(
@@ -31,11 +26,19 @@ page_navbar(
   ),
   nav_panel(
     title = "Portfolio Selection",
-    fluidRow(
-      selectInput("number_of_bonds", "Select Number of Bonds in Portfolio", c(1,2,3,4,5,6)),
-      uiOutput("bond_inputs")
-    )
-  ),
+      layout_sidebar(
+        sidebar = sidebar(
+          numericInput(inputId = "face_value", label = "Face Value ($)", value = 100000),
+          numericInput(inputId = "coupon_rate", label = "Coupon Rate (%)", min = 0, max = 25, value = 4),
+          numericInput(inputId = "time_to_maturity", label = "Time to Maturity (years)", min = 0.083, max = 30, value = 10),
+          selectInput(inputId = "payment_frequency", label = "Coupon Payment Frequency", choices = c("Annual", "Semi-Annual", "Zero-Coupon"), selected = "Semi-Annual"),
+          actionButton(inputId = "add_bond", label = "Add Bond to Portfolio"),
+          open = "always"
+      ),
+      column(width = 12,
+      DTOutput("bond_table")
+      ))
+    ),
   nav_panel(
     title = "Calculator",
     card(

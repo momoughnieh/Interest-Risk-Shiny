@@ -11,6 +11,7 @@ library(ggcorrplot)
 library(factoextra)
 library(recipes)
 library(tidyverse)
+library(DT)
 
 # Goal: Figure out how to pull data through github actions, and then read data in app.
 
@@ -130,6 +131,11 @@ bootsrapSpot <- function(parFit, yieldCurve) {
   
   return(spotRates)
 }
+
+# Function to compute key rate deltas (bond-by-bond basis)
+# Parameters: spotCurve, vector of (coupon, T2M, freq)
+
+
 
 # Step 1：ret = price - lag(price)
 ir.long <- rateData %>%

@@ -49,8 +49,10 @@ function(input, output, session) {
       "coupon" = numeric(),
       "maturity" = numeric(),
       "freq" = numeric(),
-      "pv" = numeric()
-      # "spotCurve" = list()
+      "pv" = numeric(),
+      "pv_yest" = numeric(),
+      "keySens" = list(),
+      "keySensYesterday" = list()
     )
   )
   
@@ -59,21 +61,11 @@ function(input, output, session) {
     req(nrow(entirePortfolio) < 6)
     
     faceValue <- input$face_value
-    couponRate <- input$coupon_rate
     maturity <- input$time_to_maturity
     frequency <- input$payment_frequency
-    
     freqInput <- ifelse(frequency == "Semi-Annual", 2, ifelse(frequency == "Zero-Coupon", 0, 1))
+    couponRate <- ifelse(freqInput == 0, 0, input$coupon_rate)
     
-    # lastDate <- rateData %>%
-    #   tail(., n = 1L) %>%
-    #   dplyr::pull(date)
-    # 
-    # parCurve <- rateData %>%
-    #   dplyr::filter(date == lastDate)
-    
-    # fitPar <- getSplineCurve(parCurve)
-    # spotsKey <- bootstrapSpot(fitPar, parCurve)
     
     spots <- getSplineSpot(maturity, freqInput, spotsKey)
     
@@ -83,13 +75,29 @@ function(input, output, session) {
     
     bond_id <- ifelse(length(bond_ids) != 0, bond_ids[length(bond_ids)] + 1, 1)
     
+    bondInfoVec <- c(faceValue, as.numeric(couponRate / 100), maturity, freqInput)
+    bondInfovec <- as.numeric(bondInfoVec)
+    
+    keySensToday <- list(computeKeySens(spots, bondInfoVec) %>%
+                        dplyr::rename(!!paste0("Bond ", bond_id, " Delta") := "delta",
+                                      !!paste0("Bond ", bond_id, " Gamma") := "gamma"))
+    
+    spotsYesterday <- getSplineSpot(maturity, freqInput, spotsKeyYesterday)
+    
+    bondPriceYesterday <- priceBond(faceValue, (couponRate / 100), maturity, freqInput, spotsYesterday)
+    
+    keySensYesterday <- list(computeKeySens(spotsYesterday, bondInfoVec))
+    
     tempTibble <- tibble(
-      "face_value" = faceValue,
       "bond_id" = bond_id,
+      "face_value" = faceValue,
       "coupon" = couponRate,
       "maturity" = maturity,
       "freq" = frequency,
       "pv" = bondPrice,
+      "pv_yest" = bondPriceYesterday,
+      "keySens" = keySensToday,
+      "keySensYesterday" = keySensYesterday
     ) %>%
       dplyr::mutate(freq = case_when(
         freq == "Annual" ~ 1,
@@ -137,7 +145,10 @@ function(input, output, session) {
                               "coupon" = numeric(),
                               "maturity" = numeric(),
                               "freq" = numeric(),
-                              "pv" = numeric())
+                              "pv" = numeric(),
+                              "pv_yest" = numeric(),
+                              "keySens" = list(),
+                              "keySensYesterday" = list())
   }) %>%
     bindEvent(input$clear_portfolio)
   
@@ -154,11 +165,10 @@ function(input, output, session) {
         freq == 2 ~ "Semi-Annual",
         freq == 0 ~ "Zero-Coupon"
       )) %>%
-      dplyr::select(-bond_id)
+      dplyr::select(-c(bond_id, keySens, keySensYesterday, pv_yest))
     
     DT::datatable(
       portfolioTable,
-      caption = "Portfolio Composition",
       rownames = FALSE,
       colnames = c("Face Value ($)", "Coupon Rate (%)", "Time to Maturity (years)", "Payment Frequency", "Bond Value ($)"),
       width = "150px",
@@ -174,16 +184,160 @@ function(input, output, session) {
     )
   })
   
-  observe({
-    print(names(input))
-    print(input$bond_table_rows_selected)
-  })
-  
   output$clear_selected_ui <- renderUI({
     req(input$bond_table_rows_selected > 0)
-    
     actionButton(inputId = "clear_selected_bonds", label = "Clear Selected Bond(s)")
   })
+  
+  output$coupon_rate_button <- renderUI({
+    req(input$payment_frequency != "Zero-Coupon")
+    
+    numericInput(inputId = "coupon_rate", label = "Coupon Rate (%)", min = 0, max = 25, value = 0)
+  })
+  
+  ## Table of today's exposures
+  
+  exposuresToday <- reactive({
+    req(nrow(portfolio()) > 0)
+    bondTable <- portfolio()
+    
+    bondList <- bondTable %>%
+      dplyr::select(keySens) %>%
+      dplyr::pull(keySens)
+    
+    sensDf <- bondList[[1]]
+    
+    if (length(bondList) > 1) {
+      for (dfIndex in 2:length(bondList)) {
+        
+        sensDf <- full_join(sensDf, bondList[[dfIndex]], by = "maturity")
+      }
+    }
+    
+    keyMaturities <- spotsKey$maturity
+    
+    sensDf <- sensDf %>%
+      mutate(across(everything(), ~replace_na(., 0))) %>%
+      dplyr::filter(maturity %in% keyMaturities) %>%
+      dplyr::arrange(maturity)
+    
+    sensAlone <- sensDf %>%
+      dplyr::select(-maturity)
+    
+    sensDf <- sensDf %>%
+      mutate(Portfolio = pmap(sensAlone, ~ sum(...))) %>%
+      dplyr::rename("Time to Maturity" = maturity)
+    
+    return(sensDf)
+    
+  }) %>%
+    bindEvent(input$submit_portfolio)
+  
+  output$exposure_table <- render_gt({
+    sensitivityTable <- exposuresToday() %>%
+      dplyr::select(!!"Time to Maturity", contains("Delta"))
+    
+    sensitivityTable %>%
+      gt() %>%
+      tab_style(
+        style = cell_borders(
+          sides = "all", color = "black", style = "solid"
+        ),
+        locations = cells_body()
+      ) %>%
+      tab_header(
+        title = "Bonds + Portfolio Delta Exposures"
+      )
+    })
+  
+  ## PL Attribution vs. Actual
+  
+  plAttribCalc <- reactive({
+    portTable <- portfolio()
+    
+    bondSensYesterday <- portTable %>%
+      dplyr::pull(keySensYesterday)
+    
+    sensDfYest <- bondSensYesterday[[1]]
+    
+    if (length(bondSensYesterday) > 1) {
+      
+      for (dfIndex in 2:length(bondSensYesterday)) {
+        
+        sensDfYest <- full_join(sensDfYest, bondSensYesterday[[dfIndex]], by = "maturity")
+      }
+      
+    }
+    
+    sensDfYest <- sensDfYest %>%
+      mutate(across(everything(), ~replace_na(., 0))) %>%
+      dplyr::arrange(maturity)
+    
+    sensDfDelta <- sensDfYest %>%
+      select(-maturity, -contains("gamma"))
+    
+    sensDfGamma <- sensDfYest %>%
+      select(-maturity, -contains("delta"))
+    
+    sensDfYest <- sensDfYest %>%
+      mutate(portfolioDelta = as.numeric(pmap(sensDfDelta, ~ sum(...))),
+             portfolioGamma = as.numeric(pmap(sensDfGamma, ~ sum(...)))) %>%
+      dplyr::select(maturity, portfolioDelta, portfolioGamma)
+    
+    spotSplineToday <- getSplineCurve(spotsKey %>% 
+                                        dplyr::rename(rate = spotRate))
+    spotSplineYesterday <- getSplineCurve(spotsKeyYesterday %>%
+                                            dplyr::rename(rate = spotRate))
+    
+    predMaturities <- data.frame(
+      maturity = sensDfYest$maturity
+    )
+    spotRatesToday <- spotSplineToday %>%
+      stats::predict(
+        newdata = predMaturities
+      )
+    
+    spotRatesYesterday <- spotSplineYesterday %>%
+      stats::predict(
+        newdata = predMaturities
+      )
+    
+    spotRatesYest <- tibble(
+      maturity = sensDfYest$maturity,
+      rate = spotRatesYesterday
+    )
+    
+    spotRatesTod <- tibble(
+      maturity = sensDfYest$maturity,
+      rate = spotRatesToday
+    )
+    print(spotRatesTod)
+    print(spotRatesYest)
+    
+    calcPnL <- plAttrib(spotRatesYest, spotRatesTod, sensDfYest)
+    
+    actualtoday <- portTable %>%
+      dplyr::pull(pv) %>%
+      sum(.)
+    
+    actualYesterday <- portTable %>%
+      dplyr::pull(pv_yest) %>%
+      sum(.)
+    
+    print(actualtoday - actualYesterday)
+    
+    return(calcPnL)
+  }) %>%
+    bindEvent(input$submit_portfolio)
+  
+  output$pnl_by_rate <- render_gt({
+    
+    attribPnL <- plAttribCalc()
+    
+    attribPnL %>%
+      gt()
+  })
+  
   
   observeEvent(input$calculator_button, {
     nav_select("navbar1", selected = "Calculator")

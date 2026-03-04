@@ -29,7 +29,7 @@ page_navbar(
     layout_sidebar(
       sidebar = sidebar(
         numericInput(inputId = "face_value", label = "Face Value ($)", value = 100000),
-        numericInput(inputId = "coupon_rate", label = "Coupon Rate (%)", min = 0, max = 25, value = 4),
+        uiOutput(outputId = "coupon_rate_button"),
         numericInput(inputId = "time_to_maturity", label = "Time to Maturity (years)", min = 0.083, max = 30, value = 10),
         selectInput(inputId = "payment_frequency", label = "Coupon Payment Frequency", choices = c("Annual", "Semi-Annual", "Zero-Coupon"), selected = "Semi-Annual"),
         actionButton(inputId = "add_bond", label = "Add Bond to Portfolio"),
@@ -41,6 +41,20 @@ page_navbar(
       column(width = 12,
              h4("Portfolio Assets (max. 6)"),
              DTOutput("bond_table")
+      ),
+      fluidRow(
+        column(width = 1),
+        column(width = 10,
+               hr(),
+               gt_output(outputId = "exposure_table")),
+        column(width = 1)
+      ),
+      fluidRow(
+        hr(),
+        column(width = 6,
+               gt_output(outputId = "pnl_by_rate")),
+        column(width = 6,
+               gt_output(outputId = "pnl_by_instrument"))
       ))
   ),
   nav_panel(

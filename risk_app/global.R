@@ -59,19 +59,36 @@ getSplineSpot <- function(mat, freq, spots) {
   
   splineFit <- stats::lm(spotRate ~ splines::bs(maturity, knots = c(2,3,10), degree = 3), spots)
   
-  maturities <- data.frame(
-    maturity = seq(1 / freq, mat, by = 1 / freq))
-  
-  rates <- splineFit %>% stats::predict(
-    newdata = maturities
-  ) %>%
-    unname(.)
-  
-  spotCurve <- tibble(maturity = maturities$maturity,
-                      rate = rates)
-  
-  return(spotCurve) # This is to be fed into the bond pricing function
-  
+  if (freq == 0) {
+    finalMaturity <- data.frame(
+      maturity = c(mat)
+    )
+    
+    finalRate <- splineFit %>%
+      stats::predict(
+        newdata = finalMaturity
+      ) %>%
+      unname(.)
+    
+    spotCurve <- tibble(maturity = finalMaturity$maturity,
+                        rate = finalRate)
+    return(spotCurve)
+  } else {
+    
+    maturities <- data.frame(
+      maturity = seq(1 / freq, mat, by = 1 / freq))
+    
+    rates <- splineFit %>% stats::predict(
+      newdata = maturities
+    ) %>%
+      unname(.)
+    
+    spotCurve <- tibble(maturity = maturities$maturity,
+                        rate = rates)
+    
+    return(spotCurve) # This is to be fed into the bond pricing function
+    
+  }
 }
 
 ## Function to price specific bonds ##
@@ -79,33 +96,48 @@ getSplineSpot <- function(mat, freq, spots) {
 
 priceBond <- function(faceVal, C, mat, freq, spotRate) {
   
-  pricingTable <- tibble(maturity = spotRate$maturity[-length(spotRate$maturity)],
-                         cashFlow = ((C * faceVal) / 2),
-                         rate = spotRate$rate[-length(spotRate$rate)])
-  
-  lastRowCF <- tibble(maturity = spotRate$maturity[length(spotRate$maturity)],
-                      cashFlow = faceVal + ((C * faceVal) / 2),
-                      rate = spotRate$rate[length(spotRate$rate)])
-  
-  pricingTable <- bind_rows(pricingTable, lastRowCF) %>%
-    dplyr::mutate(discFactor = (1 / (1 + (rate / freq))^(maturity*freq))) %>%
-    dplyr::mutate(cashFlowPV = cashFlow * discFactor)
-  
-  finalPrice <- round(sum(pricingTable$cashFlowPV), 2)
-  
-  return(finalPrice)
+  if (freq == 0){
+    finalSpot <- spotRate %>%
+      dplyr::pull(rate)
+    
+    finalPrice <- round(faceVal / (1 + finalSpot)^(mat), 2)
+    
+    return(finalPrice)
+      
+    
+  } else {
+    
+    pricingTable <- tibble(maturity = spotRate$maturity[-length(spotRate$maturity)],
+                           cashFlow = ((C * faceVal) / 2),
+                           rate = spotRate$rate[-length(spotRate$rate)])
+    
+    lastRowCF <- tibble(maturity = spotRate$maturity[length(spotRate$maturity)],
+                        cashFlow = faceVal + ((C * faceVal) / 2),
+                        rate = spotRate$rate[length(spotRate$rate)])
+    
+    pricingTable <- bind_rows(pricingTable, lastRowCF) %>%
+      dplyr::mutate(discFactor = (1 / (1 + (rate / freq))^(maturity*freq))) %>%
+      dplyr::mutate(cashFlowPV = cashFlow * discFactor)
+    
+    finalPrice <- round(sum(pricingTable$cashFlowPV), 2)
+    
+    return(finalPrice)
+    
+  }
 }
 
 # This function comptues the sensitivites WITHIN a specific bond to each key spot rate
 
 computeKeySens <- function(spotCurve, bondInfo) {
   
-  stepSize = 0.0001 # 1 BP sensitivity
+  stepSize <- 0.0001 # 1 BP sensitivity
   
   faceVal <- bondInfo[1]
   couponRate <- bondInfo[2]
   maturity <- bondInfo[3]
   frequency <- bondInfo[4]
+  
+  priceStable <- priceBond(faceVal, couponRate, maturity, frequency, spotCurve)
   
   priceUps <- c() 
   priceDowns <- c()
@@ -120,6 +152,9 @@ computeKeySens <- function(spotCurve, bondInfo) {
     
     priceUp <- priceBond(faceVal, couponRate, maturity, frequency, shockedUp)
     priceDown <- priceBond(faceVal, couponRate, maturity, frequency, shockedDown)
+    
+    priceUps <- append(priceUps, priceUp)
+    priceDowns <- append(priceDowns, priceDown)
   }
   
   # So far: Only delta calculations. Will amend later for gamma.
@@ -127,9 +162,11 @@ computeKeySens <- function(spotCurve, bondInfo) {
   sensTibble <- spotCurve %>%
     dplyr::select(-rate) %>%
     dplyr::mutate(priceUp = priceUps,
-                  pricedown = priceDowns) %>%
-    dplyr::mutate(delta = ((priceUp - priceDown) / (2 * stepSize)) / 10000) %>%
-    dplyr::select(-c(priceUp, priceDown))
+                  priceDown = priceDowns,
+                  priceStable = priceStable) %>%
+    dplyr::mutate(delta = ((priceUp - priceDown) / (2 * stepSize))) %>%
+    dplyr::mutate(gamma = ((priceUp - (2 * priceStable) + priceDown) / ((stepSize)^2))) %>%
+    dplyr::select(-c(priceUp, priceDown, priceStable))
   
   return(sensTibble) 
   
@@ -223,21 +260,43 @@ lastDate <- rateData %>%
   tail(., n = 1L) %>%
   dplyr::pull(date)
 
-dayBefore <- rateData %>%
-  tail(., n = 2L) %>% 
-  dplyr::slice(1) %>%
-  dplyr::pull(date)
-
-
-
 parCurve <- rateData %>%
   dplyr::filter(date == lastDate)
 
 fitPar <- getSplineCurve(parCurve)
 spotsKey <- bootstrapSpot(fitPar, parCurve)
 
-# Function to compute key rate deltas (bond-by-bond basis)
-# Parameters: spotCurve, vector of (coupon, T2M, freq)
+dayBefore <- rateData %>%
+  tail(., n = 2L) %>% 
+  dplyr::slice(1) %>%
+  dplyr::pull(date)
+
+parCurveYesterday <- rateData %>%
+  dplyr::filter(date == dayBefore)
+
+fitParYesterday <- getSplineCurve(parCurveYesterday)
+spotsKeyYesterday <- bootstrapSpot(fitParYesterday, parCurveYesterday)
+
+# PL Attribution Function
+
+plAttrib <- function(spotsYesterday, spotsToday, sensYesterday) {
+  
+  yesterdayRates <- spotsYesterday %>%
+    dplyr::pull(rate)
+  
+  todayRates <- spotsToday %>%
+    dplyr::pull(rate)
+  
+  changeRates <- todayRates - yesterdayRates
+  
+  attribPnL <- sensYesterday %>%
+    dplyr::mutate(rateChange = changeRates) %>%
+    dplyr::mutate("Delta PnL" = rateChange * portfolioDelta,
+                  "Gamma PnL" = (0.5 * portfolioGamma) * (rateChange^2),
+                  "Total PnL" = `Delta PnL` + `Gamma PnL`)
+  
+  return(attribPnL)
+}
 
 
 

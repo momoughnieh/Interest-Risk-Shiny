@@ -311,8 +311,6 @@ function(input, output, session) {
       maturity = sensDfYest$maturity,
       rate = spotRatesToday
     )
-    print(spotRatesTod)
-    print(spotRatesYest)
     
     calcPnL <- plAttrib(spotRatesYest, spotRatesTod, sensDfYest)
     
@@ -323,8 +321,6 @@ function(input, output, session) {
     actualYesterday <- portTable %>%
       dplyr::pull(pv_yest) %>%
       sum(.)
-    
-    print(actualtoday - actualYesterday)
     
     return(calcPnL)
   }) %>%

@@ -12,6 +12,7 @@ library(factoextra)
 library(recipes)
 library(tidyverse)
 library(DT)
+library(gt)
 
 # Goal: Figure out how to pull data through github actions, and then read data in app.
 

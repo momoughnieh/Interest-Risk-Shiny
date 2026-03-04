@@ -9,6 +9,7 @@
 
 library(shiny)
 library(bslib)
+library(plotly)
 
 page_navbar(
   title = "Portfolio Risk Calculator",
@@ -55,6 +56,12 @@ page_navbar(
                gt_output(outputId = "pnl_by_rate")),
         column(width = 6,
                gt_output(outputId = "pnl_by_instrument"))
+      ),
+      fluidRow(
+        column(width = 1),
+        column(width = 10,
+               plotlyOutput("portfolio_pie", height = "350px")),
+        column(width = 1)
       ))
   ),
   nav_panel(
@@ -66,10 +73,35 @@ page_navbar(
     fluidRow(
       uiOutput("info_button")
     )
-  ),nav_panel(
+  ),
+  nav_panel(
     title = "Co-Dynamics",
-    plotOutput("corrPlot"),
-    plotOutput("screePlot"),
-    plotOutput("loadingsPlot")
+    layout_sidebar(
+      sidebar = sidebar(
+        selectInput(
+          inputId  = "vol_maturity",
+          label    = "Maturity (Years)",
+          choices  = c("0.0833", "0.25", "0.5", "1", "2", "3", "5", "7", "10", "20", "25", "30"),
+          selected = "10"
+        ),
+        sliderInput(
+          inputId = "vol_window",
+          label   = "Rolling Window (Days)",
+          min = 21, max = 252, value = 63, step = 21
+        ),
+        actionButton(inputId = "submit_cor", label = "Submit Selection", class = "btn-success")
+      ),
+      column(width = 12,
+           titlePanel("Co-Dynamics")
+           ),
+      fluidRow(
+        plotlyOutput("rolling_vol_plot", height = "350px"),
+        plotOutput("corrPlot"),
+        plotOutput("screePlot"),
+        plotOutput("loadingsPlot")
+    )
+  )
   )
 )
+
+

@@ -18,15 +18,15 @@ library(gt)
 
 grabRates <- function() {
   rateTickers <- c("DGS1MO", "DGS3MO", "DGS6MO", "DGS1", "DGS2", "DGS3", "DGS5", "DGS7", "DGS10", "DGS20", "DGS25", "DGS30")
-  
+
   # Pull data
   rateDat <- rateTickers %>%
     tq_get(get = "economic.data",
            from = "1992-01-01",
            to = Sys.Date())
-  
+
   # Clean data
-  
+
   rateDat <- rateDat %>%
     tidyr::drop_na() %>%
     dplyr::mutate(price = price / 100) %>%
@@ -34,7 +34,7 @@ grabRates <- function() {
     dplyr::mutate(maturityChar = str_extract(symbol, "\\d+.*")) %>%
     dplyr::mutate(maturity = ifelse(str_detect(maturityChar, "MO"), as.numeric(str_extract(maturityChar, "\\d")) / 12, as.numeric(maturityChar))) %>%
     dplyr::select(-maturityChar, -symbol)
-  
+
   return(rateDat)
 }
 
@@ -43,12 +43,12 @@ rateData <- grabRates()
 ## Spline Curve function -- to be used on par yields to bootstrap zero curve ##
 
 getSplineCurve <- function(yieldCurve) {
-  
+
   # This function takes a data frame of different single point rates at different maturities and fits a curve
   # Used to interpolate rates in between rates pulled from FRED (eg. incase we need a rate for 1.5Y maturity)
-  
+
   yieldFit <- stats::lm(rate ~ splines::bs(maturity, knots = c(2,3,10), degree = 3), yieldCurve)
-  
+
   return(yieldFit)
 }
 
@@ -57,38 +57,38 @@ getSplineCurve <- function(yieldCurve) {
 ## Purpose: Spline once so that we can adequately observe shock effects on particular yields. Shocking & re-splining changes rates we don't intend to shock ##
 
 getSplineSpot <- function(mat, freq, spots) {
-  
+
   splineFit <- stats::lm(spotRate ~ splines::bs(maturity, knots = c(2,3,10), degree = 3), spots)
-  
+
   if (freq == 0) {
     finalMaturity <- data.frame(
       maturity = c(mat)
     )
-    
+
     finalRate <- splineFit %>%
       stats::predict(
         newdata = finalMaturity
       ) %>%
       unname(.)
-    
+
     spotCurve <- tibble(maturity = finalMaturity$maturity,
                         rate = finalRate)
     return(spotCurve)
   } else {
-    
+
     maturities <- data.frame(
       maturity = seq(1 / freq, mat, by = 1 / freq))
-    
+
     rates <- splineFit %>% stats::predict(
       newdata = maturities
     ) %>%
       unname(.)
-    
+
     spotCurve <- tibble(maturity = maturities$maturity,
                         rate = rates)
-    
+
     return(spotCurve) # This is to be fed into the bond pricing function
-    
+
   }
 }
 
@@ -96,70 +96,70 @@ getSplineSpot <- function(mat, freq, spots) {
 ## Inputs: face value, coupon rate, maturity, payment frequency, and the appropriate spot rates given the payment periods ##
 
 priceBond <- function(faceVal, C, mat, freq, spotRate) {
-  
+
   if (freq == 0){
     finalSpot <- spotRate %>%
       dplyr::pull(rate)
-    
+
     finalPrice <- round(faceVal / (1 + finalSpot)^(mat), 2)
-    
+
     return(finalPrice)
-      
-    
+
+
   } else {
-    
+
     pricingTable <- tibble(maturity = spotRate$maturity[-length(spotRate$maturity)],
                            cashFlow = ((C * faceVal) / 2),
                            rate = spotRate$rate[-length(spotRate$rate)])
-    
+
     lastRowCF <- tibble(maturity = spotRate$maturity[length(spotRate$maturity)],
                         cashFlow = faceVal + ((C * faceVal) / 2),
                         rate = spotRate$rate[length(spotRate$rate)])
-    
+
     pricingTable <- bind_rows(pricingTable, lastRowCF) %>%
       dplyr::mutate(discFactor = (1 / (1 + (rate / freq))^(maturity*freq))) %>%
       dplyr::mutate(cashFlowPV = cashFlow * discFactor)
-    
+
     finalPrice <- round(sum(pricingTable$cashFlowPV), 2)
-    
+
     return(finalPrice)
-    
+
   }
 }
 
 # This function comptues the sensitivites WITHIN a specific bond to each key spot rate
 
 computeKeySens <- function(spotCurve, bondInfo) {
-  
+
   stepSize <- 0.0001 # 1 BP sensitivity
-  
+
   faceVal <- bondInfo[1]
   couponRate <- bondInfo[2]
   maturity <- bondInfo[3]
   frequency <- bondInfo[4]
-  
+
   priceStable <- priceBond(faceVal, couponRate, maturity, frequency, spotCurve)
-  
-  priceUps <- c() 
+
+  priceUps <- c()
   priceDowns <- c()
-  
+
   for (row in 1:nrow(spotCurve)) {
-    
+
     shockedUp <- spotCurve
     shockedUp[row, 2] <- shockedUp[row, 2] + stepSize
-    
+
     shockedDown <- spotCurve
     shockedDown[row, 2] <- shockedDown[row, 2] - stepSize
-    
+
     priceUp <- priceBond(faceVal, couponRate, maturity, frequency, shockedUp)
     priceDown <- priceBond(faceVal, couponRate, maturity, frequency, shockedDown)
-    
+
     priceUps <- append(priceUps, priceUp)
     priceDowns <- append(priceDowns, priceDown)
   }
-  
+
   # So far: Only delta calculations. Will amend later for gamma.
-  
+
   sensTibble <- spotCurve %>%
     dplyr::select(-rate) %>%
     dplyr::mutate(priceUp = priceUps,
@@ -168,47 +168,47 @@ computeKeySens <- function(spotCurve, bondInfo) {
     dplyr::mutate(delta = ((priceUp - priceDown) / (2 * stepSize))) %>%
     dplyr::mutate(gamma = ((priceUp - (2 * priceStable) + priceDown) / ((stepSize)^2))) %>%
     dplyr::select(-c(priceUp, priceDown, priceStable))
-  
-  return(sensTibble) 
-  
+
+  return(sensTibble)
+
 }
 
 
 bootstrapSpot <- function(parFit, yieldCurve) {
   # Bootstrap spot yields #
-  
+
   # Price at par is 100
-  
+
   parPrice <- 100
-  
+
   # Assuming 1, 3, and 6 month par yields are equal to spot (no coupons)
-  
+
   all_maturities <- data.frame(
     maturity = seq(0.5, 30, by = 0.5)
   )
-  
+
   # Generate par yields for all coupon payment dates
   parRates <- parFit %>%
     stats::predict(newdata = all_maturities) %>%
     unname(.)
-  
+
   parYields <- tibble(maturity = seq(0.5, 30, by = 0.5),
                       parRate = parRates)
-  
+
   spotRates <- tibble(maturity = c(0.5),
                       spotRate = c(parYields$parRate[1]))
-  
+
   # Back out spot rates for every maturity, add to spotYields data frame.
   for (mat in parYields$maturity[2:length(parYields$maturity)]) {
-    
+
     # Par yields mean YTM = coupon rate
     couponRate <- parYields %>%
       dplyr::filter(maturity == mat) %>%
       dplyr::pull(parRate)
-    
+
     # Coupon payment amount
     couponAmt = (couponRate * parPrice) / 2
-    
+
     # Pull available spot rates with respective maturities to discount coupon payments
     spotrates <- spotRates %>%
       dplyr::filter(maturity < mat) %>%
@@ -216,44 +216,44 @@ bootstrapSpot <- function(parFit, yieldCurve) {
     maturities <- spotRates %>%
       dplyr::filter(maturity < mat) %>%
       dplyr::pull(maturity)
-    
+
     # Calculate vector of discount factors for every coupon date
     discFactors <- (1 / (1 + spotrates / 2)^(2*maturities))
-    
+
     sumDiscFactors <- sum(discFactors)
-    
+
     # Present value of coupons
     pvCoupons <- couponAmt * sumDiscFactors
-    
+
     # Back out spot rate from final payment (principal + coupon)
     # Breaking apart & rearrange formula to solve for spot rate algebraically.
-    
+
     finalTermDiscFactor <- (parPrice - pvCoupons) / (parPrice + couponAmt)
-    
+
     newSpotRate <- 2 * ((finalTermDiscFactor^(-1/(mat * 2))) - 1)
-    
+
     # Bind to dataframe before next iteration
-    
+
     tempdf <- tibble(maturity = mat,
                      spotRate = newSpotRate)
-    
+
     spotRates <- rbind(spotRates, tempdf)
   }
-  
+
   shortTermRates <- yieldCurve %>%
     dplyr::filter(maturity < 0.5) %>%
     dplyr::rename(spotRate = rate) %>%
     dplyr::select(-date)
-  
+
   spotRates <- rbind(spotRates, shortTermRates) %>%
     arrange(maturity)
-  
+
   uniqueMaturities <- yieldCurve %>%
     dplyr::pull(maturity)
-  
+
   spotRates <- spotRates %>%
     dplyr::filter(maturity %in% uniqueMaturities)
-  
+
   return(spotRates)
 }
 
@@ -268,7 +268,7 @@ fitPar <- getSplineCurve(parCurve)
 spotsKey <- bootstrapSpot(fitPar, parCurve)
 
 dayBefore <- rateData %>%
-  tail(., n = 2L) %>% 
+  tail(., n = 2L) %>%
   dplyr::slice(1) %>%
   dplyr::pull(date)
 
@@ -281,21 +281,21 @@ spotsKeyYesterday <- bootstrapSpot(fitParYesterday, parCurveYesterday)
 # PL Attribution Function
 
 plAttrib <- function(spotsYesterday, spotsToday, sensYesterday) {
-  
+
   yesterdayRates <- spotsYesterday %>%
     dplyr::pull(rate)
-  
+
   todayRates <- spotsToday %>%
     dplyr::pull(rate)
-  
+
   changeRates <- todayRates - yesterdayRates
-  
+
   attribPnL <- sensYesterday %>%
     dplyr::mutate(rateChange = changeRates) %>%
     dplyr::mutate("Delta PnL" = rateChange * portfolioDelta,
                   "Gamma PnL" = (0.5 * portfolioGamma) * (rateChange^2),
                   "Total PnL" = `Delta PnL` + `Gamma PnL`)
-  
+
   return(attribPnL)
 }
 

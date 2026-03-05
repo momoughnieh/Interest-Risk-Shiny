@@ -17,13 +17,34 @@ page_navbar(
   theme = bs_theme(bootswatch = "flatly"),
   nav_panel(
     title = "General Info",
-    card(
-      card_header("U.S. Treasury Yield Curve Dynamics"),
-      plotlyOutput("yield_curve_dynamics", height = "400px")
+    layout_sidebar(
+      sidebar = sidebar(
+        selectInput(
+          inputId  = "vol_maturity",
+          label    = "Maturity (Years)",
+          choices  = c("0.0833", "0.25", "0.5", "1", "2", "3", "5", "7", "10", "20", "25", "30"),
+          selected = "10"
+        ),
+        sliderInput(
+          inputId = "vol_window",
+          label   = "Rolling Window (Days)",
+          min = 21, max = 252, value = 63, step = 21
+        ),
+        actionButton(inputId = "submit_cor", label = "Submit Selection", class = "btn-success")
+      ),
+      column(width = 12,
+             h4("U.S. Treasury Yield Curve Dynamics")
+      ),
+    fluidRow(
+      plotlyOutput("yield_curve_dynamics", height = "600px")
+    ),
+    fluidRow(
+      plotlyOutput("rolling_vol_plot", height = "350px")
     ),
     fluidRow(
       uiOutput("calculator_button")
     )
+  )
   ),
   nav_panel(
     title = "Portfolio Selection",
@@ -65,43 +86,16 @@ page_navbar(
       ))
   ),
   nav_panel(
-    title = "Calculator",
-    card(
-      card_header ("Example Table"),
-      tableOutput("example_table")
-    ),
-    fluidRow(
-      uiOutput("info_button")
-    )
-  ),
-  nav_panel(
     title = "Co-Dynamics",
-    layout_sidebar(
-      sidebar = sidebar(
-        selectInput(
-          inputId  = "vol_maturity",
-          label    = "Maturity (Years)",
-          choices  = c("0.0833", "0.25", "0.5", "1", "2", "3", "5", "7", "10", "20", "25", "30"),
-          selected = "10"
-        ),
-        sliderInput(
-          inputId = "vol_window",
-          label   = "Rolling Window (Days)",
-          min = 21, max = 252, value = 63, step = 21
-        ),
-        actionButton(inputId = "submit_cor", label = "Submit Selection", class = "btn-success")
-      ),
       column(width = 12,
-           titlePanel("Co-Dynamics")
+           h4("Co-Dynamics")
            ),
       fluidRow(
-        plotlyOutput("rolling_vol_plot", height = "350px"),
         plotOutput("corrPlot"),
         plotOutput("screePlot"),
         plotOutput("loadingsPlot")
     )
   )
   )
-)
 
 

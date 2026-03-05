@@ -64,7 +64,7 @@ function(input, output, session) {
     maturity <- input$time_to_maturity
     frequency <- input$payment_frequency
     freqInput <- ifelse(frequency == "Semi-Annual", 2, ifelse(frequency == "Zero-Coupon", 0, 1))
-    couponRate <- ifelse(freqInput == 0, 0, input$coupon_rate)
+    couponRate <- if (freqInput == 0) 0 else input$coupon_rate
 
 
     spots <- getSplineSpot(maturity, freqInput, spotsKey)

@@ -18,8 +18,8 @@ page_navbar(
   nav_panel(
     title = "General Info",
     card(
-      card_header("Example Graph"),
-      plotOutput("example_plot")
+      card_header("U.S. Treasury Yield Curve Dynamics"),
+      plotlyOutput("yield_curve_dynamics", height = "400px")
     ),
     fluidRow(
       uiOutput("calculator_button")

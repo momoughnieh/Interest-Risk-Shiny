@@ -9,7 +9,7 @@
 
 library(shiny)
 
-# Define server logic required to draw a histogram
+
 function(input, output, session) {
 
   output$calculator_button <- renderUI({
@@ -437,6 +437,63 @@ function(input, output, session) {
       )
   })%>%
     bindEvent(input$submit_cor)
+
+  output$yield_curve_dynamics <- renderPlotly({
+    maturities <- sort(unique(rateData$maturity))
+    colors <- colorRampPalette(c("#2c7bb6", "#abd9e9", "#fdae61", "#d7191c"))(length(maturities))
+
+    p <- plotly::plot_ly()
+
+    for (i in seq_along(maturities)) {
+      mat <- maturities[i]
+
+      matDat <- rateData %>%
+        dplyr::filter(maturity == mat) %>%
+        dplyr::arrange(date)
+
+      label <- if (mat < 1) paste0(round(mat * 12), "M") else paste0(mat, "Y")
+
+      p <- p %>%
+        plotly::add_trace(
+          data      = matDat,
+          x         = ~date,
+          y         = ~rate * 100,
+          type      = "scatter",
+          mode      = "lines",
+          name      = label,
+          line      = list(
+            color = colors[i],
+            width = 1,
+            dash  = "dot"
+          ),
+          hovertemplate = paste0(
+            "<b>", label, " Treasury</b><br>",
+            "Date: %{x}<br>",
+            "Yield: %{y:.2f}%<extra></extra>"
+          )
+        )
+    }
+
+    p %>%
+      plotly::layout(
+        title = list(
+          text = "U.S. Treasury Yield Curve Dynamics",
+          font = list(size = 18)
+        ),
+        xaxis = list(
+          title = "Date",
+          type  = "date"
+        ),
+        yaxis = list(
+          title = "Yield (%)"
+        ),
+        legend = list(
+          title       = list(text = "Maturity"),
+          orientation = "v"
+        ),
+        hovermode = "x unified"
+      )
+  })
 
 
 }

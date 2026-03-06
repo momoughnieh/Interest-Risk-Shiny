@@ -518,5 +518,57 @@ function(input, output, session) {
       )
   })
 
+  corr_data <- reactive({
+    req(input$corr_selection, input$corr_date_selection)
+    selected_maturities <- as.numeric(input$corr_selection)
+    ir.wide %>%
+      dplyr::filter(
+        date >= input$corr_date_selection[1],
+        date <= input$corr_date_selection[2]
+      ) %>%
+      na.omit() %>%
+      dplyr::select(any_of(as.character(selected_maturities)))
+  }) %>%
+    bindEvent(input$submit_corr)
+
+  corrMatrix <- reactive({
+    req(corr_data())
+    matrix <- corr_data() %>%
+      stats::cor(method = "kendall")
+    labels <- sapply(as.numeric(colnames(matrix)), function(m) {
+      if (m < 1) paste0(round(m * 12), "M") else paste0(m, "Y")
+    })
+    colnames(matrix) <- labels
+    rownames(matrix) <- labels
+    return(matrix)
+  }) %>%
+    bindEvent(input$submit_corr)
+
+  output$corr_table <- render_gt({
+    req(corrMatrix())
+
+    matrix1 <- corrMatrix()
+
+    as.data.frame(matrix1) %>%
+      tibble::rownames_to_column("Maturity") %>%
+      gt() %>%
+      tab_header(title = paste0("Correlation Matrix - ", input$corr_date_selection[1], " to ", input$corr_date_selection[2])) %>%
+      fmt_number(
+        columns = -Maturity,
+        decimals = 2
+      ) %>%
+      data_color(
+        columns  = -Maturity,
+        palette  = c("green", "yellow", "blue"),
+        domain   = c(-1, 1),
+        na_color = "white"
+      ) %>%
+      tab_style(
+        style     = cell_borders(sides = "all", color = "black", style = "solid"),
+        locations = cells_body()
+      ) %>%
+      cols_align(align = "center", columns = -Maturity)
+  }) %>%
+    bindEvent(input$submit_corr)
 
 }

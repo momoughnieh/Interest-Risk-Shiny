@@ -22,7 +22,7 @@ page_navbar(
         selectInput(
           inputId  = "vol_maturity",
           label    = "Maturity (Years)",
-          choices  = c("0.0833", "0.25", "0.5", "1", "2", "3", "5", "7", "10", "20", "25", "30"),
+          choices  = c("0.0833", "0.25", "0.5", "1", "2", "3", "5", "7", "10", "20", "30"),
           selected = "10"
         ),
         sliderInput(
@@ -87,15 +87,35 @@ page_navbar(
   ),
   nav_panel(
     title = "Co-Dynamics",
+    layout_sidebar(
+      sidebar = sidebar(
+        checkboxGroupInput(
+          inputId  = "corr_selection",
+          label    = "Maturity (Years)",
+          choices  = c("0.0833", "0.25", "0.5", "1", "2", "3", "5", "7", "10", "20", "30"),
+          selected = "10"
+        ),
+        dateRangeInput(
+          inputId = "corr_date_selection",
+          label = "Select Date Range",
+          start = "1992-01-01",
+          end = Sys.Date(),
+          min = "1992-01-01",
+          max = Sys.Date()
+        ),
+        actionButton(inputId = "submit_corr", label = "Submit Selection", class = "btn-success")
+      ),
       column(width = 12,
            h4("Co-Dynamics")
            ),
       fluidRow(
+        gt_output("corr_table"),
         plotOutput("corrPlot"),
         plotOutput("screePlot"),
         plotOutput("loadingsPlot")
     )
   )
   )
+)
 
 

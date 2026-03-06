@@ -3,7 +3,7 @@ name: Import Economic Data morning 8am
 on:
   schedule:
     - cron: "0 15 * * *" #Runs on the 0 minute on the 15 hour each day
-  workflow_dipatch:
+  workflow_dispatch:
 
 
 jobs:

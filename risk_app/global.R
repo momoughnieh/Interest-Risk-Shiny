@@ -1,3 +1,4 @@
+library(arrow)
 library(dplyr)
 library(magrittr)
 library(lubridate)
@@ -15,6 +16,7 @@ library(DT)
 library(gt)
 library(Rcpp)
 sourceCpp('riskMeasures.cpp')
+
 
 # Goal: Figure out how to pull data through github actions, and then read data in app.
 
@@ -40,7 +42,8 @@ grabRates <- function() {
   return(rateDat)
 }
 
-rateData <- grabRates()
+
+rateData <- arrow::read_feather(here::here("data/rates.feather"))
 
 ## Spline Curve function -- to be used on par yields to bootstrap zero curve ##
 

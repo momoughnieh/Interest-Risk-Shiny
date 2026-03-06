@@ -15,6 +15,7 @@ library(tidyverse)
 library(DT)
 library(gt)
 library(Rcpp)
+library(slider)
 sourceCpp('riskMeasure.cpp')
 sourceCpp('spread.cpp')
 

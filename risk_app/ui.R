@@ -22,7 +22,7 @@ page_navbar(
         selectInput(
           inputId  = "vol_maturity",
           label    = "Maturity (Years)",
-          choices  = c("0.0833", "0.25", "0.5", "1", "2", "3", "5", "7", "10", "20", "30"),
+          choices  = c("0.0833", "0.25", "0.5", "1", "2", "5", "7", "10", "20", "30"),
           selected = "10"
         ),
         sliderInput(
@@ -92,7 +92,7 @@ page_navbar(
         checkboxGroupInput(
           inputId  = "corr_selection",
           label    = "Maturity (Years)",
-          choices  = c("0.0833", "0.25", "0.5", "1", "2", "3", "5", "7", "10", "20", "30"),
+          choices  = c("0.0833", "0.25", "0.5", "1", "2", "5", "7", "10", "20", "30"),
           selected = "10"
         ),
         dateRangeInput(

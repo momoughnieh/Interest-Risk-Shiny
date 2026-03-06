@@ -12,7 +12,7 @@ library(bslib)
 library(plotly)
 
 page_navbar(
-  title = "Portfolio Risk Calculator",
+  title = "Interst Rate Risk App",
   id = "navbar1",
   theme = bs_theme(bootswatch = "flatly"),
   nav_panel(

@@ -20,30 +20,44 @@ sourceCpp('riskMeasure.cpp')
 
 # Goal: Figure out how to pull data through github actions, and then read data in app.
 
-grabRates <- function() {
-  rateTickers <- c("DGS1MO", "DGS3MO", "DGS6MO", "DGS1", "DGS2", "DGS3", "DGS5", "DGS7", "DGS10", "DGS20", "DGS25", "DGS30")
-
-  # Pull data
-  rateDat <- rateTickers %>%
-    tq_get(get = "economic.data",
-           from = "1992-01-01",
-           to = Sys.Date())
-
-  # Clean data
-
-  rateDat <- rateDat %>%
-    tidyr::drop_na() %>%
-    dplyr::mutate(price = price / 100) %>%
-    dplyr::rename("rate" = price) %>%
-    dplyr::mutate(maturityChar = str_extract(symbol, "\\d+.*")) %>%
-    dplyr::mutate(maturity = ifelse(str_detect(maturityChar, "MO"), as.numeric(str_extract(maturityChar, "\\d")) / 12, as.numeric(maturityChar))) %>%
-    dplyr::select(-maturityChar, -symbol)
-
-  return(rateDat)
-}
-
 
 rateData <- arrow::read_feather(here::here("data/rates.feather"))
+
+alteredDat <- rateData %>%
+  dplyr::arrange(maturity) %>%
+  dplyr::group_by(maturity) %>%
+  dplyr::mutate(changeBasisPoints = (rate - dplyr::lag(rate)) * 10000) %>%
+  tidyr::drop_na() %>%
+  dplyr::mutate(sd = slide_dbl(
+    .x = changeBasisPoints,
+    .f = ~ sd(.x),
+    .before = 90,
+    .after = 0,
+    .complete = TRUE
+  )) %>%
+  dplyr::rename(ytm = rate) %>%
+  tidyr::drop_na() %>%
+  dplyr::filter(maturity > 0.25) %>%
+  dplyr::mutate(periods = maturity * 2) %>%
+  dplyr::mutate(fv = 100,
+                coupon = (fv * ytm)/2)
+
+dates <- alteredDat$date
+
+alteredDat <- alteredDat %>%
+  dplyr::select(-date) %>%
+  dplyr::mutate(priceToday = 100,
+                priceUp = 100,
+                priceDown = 100,
+                delta = 0.5,
+                gamma = 0.5,
+                risk = 0.5)
+
+riskData <- calcRiskMeasures(as.matrix(alteredDat)) %>%
+  as_tibble(.) %>%
+  dplyr::mutate(date = dates) %>%
+  dplyr::select(date, everything())
+
 
 ## Spline Curve function -- to be used on par yields to bootstrap zero curve ##
 
@@ -310,7 +324,7 @@ plAttrib <- function(spotsYesterday, spotsToday, sensYesterday) {
 ir.long <- rateData %>%
   dplyr::group_by(maturity) %>%
   dplyr::arrange(date) %>%
-  dplyr::mutate(ret = rate - dplyr::lag(rate)) %>%   # 课本: ret = price - lag(price)
+  dplyr::mutate(ret = rate - dplyr::lag(rate)) %>%
   stats::na.omit() %>%
   dplyr::ungroup()
 

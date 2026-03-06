@@ -584,9 +584,9 @@ function(input, output, session) {
       line = list(color = "orange", width = 1.2)
       ) %>%
     plotly::layout(
-        title = ("Curve Steepness Over Time: 30yr  - 1yr"),
+        title = ("Steepness Spread"),
         xaxis = list(title = "Date", type = "date"),
-        yaxis = list(title = "Spread (bps)")
+        yaxis = list(title = "Difference in Rate (%)")
       )
   })
 
@@ -603,9 +603,9 @@ function(input, output, session) {
       line = list(color = "blue", width = 1.2)
     ) %>%
       plotly::layout(
-        title = ("Butterfly Spread Over Time: (-2yr) + 2x10yr - 30yr"),
+        title = ("Butterfly Spread"),
         xaxis = list(title = "Date", type = "date"),
-        yaxis = list(title = "Spread (bps)")
+        yaxis = list(title = "Difference in Rate (%)")
       )
   })
 

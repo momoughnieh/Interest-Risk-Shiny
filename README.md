@@ -25,7 +25,7 @@ Pricing is based on zero-rates which were boostrapped from the par yield curve.
 
 This tab showcases two spread plots which include so that the user can observe the relationship between yields historically to date.
 
-On the sidebar, the user can select the parameters to generate a correlation matrix acorss various maturities. The user also has the option to select
+On the sidebar, the user can select the parameters to generate a correlation matrix across various maturities. The user also has the option to select
 a time period on which they want the correlations to be calculated on.
 
 # Deployment

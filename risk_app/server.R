@@ -427,7 +427,7 @@ function(input, output, session) {
       plotData,
       x = ~date, y = ~rolling_vol,
       type = "scatter", mode = "lines",
-      line = list(color = "#2c7bb6", width = 1.2)
+      line = list(color = "blue", width = 1.2)
     ) %>%
       plotly::layout(
         title = paste0("Rolling ", input$vol_window, "-Day Annualised Volatility — ",
@@ -440,7 +440,7 @@ function(input, output, session) {
 
   output$yield_curve_dynamics <- renderPlotly({
     maturities <- sort(unique(rateData$maturity))
-    colors <- colorRampPalette(c("#2c7bb6", "#abd9e9", "#fdae61", "#d7191c"))(length(maturities))
+    colors <- colorRampPalette(c("blue", "lightblue", "orange", "red"))(length(maturities))
 
     p <- plotly::plot_ly()
 
@@ -507,8 +507,8 @@ function(input, output, session) {
       y = ~rate * 100,
       type = "scatter",
       mode = "lines+markers",
-      line   = list(color = "#2c7bb7", width = 2),
-      marker = list(color = "#2c7bb7", size  = 8)
+      line   = list(color = "blue", width = 2),
+      marker = list(color = "blue", size  = 8)
     ) %>%
       plotly::layout(
         title = paste0("U.S. Treasury Yield Curve — ", format(lastDate, "%B %d, %Y")),

@@ -446,13 +446,10 @@ function(input, output, session) {
 
     for (i in seq_along(maturities)) {
       mat <- maturities[i]
-
       matDat <- rateData %>%
         dplyr::filter(maturity == mat) %>%
         dplyr::arrange(date)
-
       label <- if (mat < 1) paste0(round(mat * 12), "M") else paste0(mat, "Y")
-
       p <- p %>%
         plotly::add_trace(
           data      = matDat,
@@ -492,6 +489,32 @@ function(input, output, session) {
           orientation = "v"
         ),
         hovermode = "x unified"
+      )
+  })
+
+  output$todays_curve <- renderPlotly({
+
+    todayCurve <- rateData %>%
+      dplyr::filter(date == lastDate) %>%
+      dplyr::arrange(maturity) %>%
+      dplyr::mutate(label = sapply(maturity, function(m) {
+        if (m < 1) paste0(round(m * 12), "M") else paste0(m, "Y")
+      }))
+
+    plotly::plot_ly(
+      todayCurve,
+      x = ~label,
+      y = ~rate * 100,
+      type = "scatter",
+      mode = "lines+markers",
+      line   = list(color = "#2c7bb7", width = 2),
+      marker = list(color = "#2c7bb7", size  = 8)
+    ) %>%
+      plotly::layout(
+        title = paste0("U.S. Treasury Yield Curve — ", format(lastDate, "%B %d, %Y")),
+        xaxis = list(title = "Maturity", categoryorder = "array",
+                     categoryarray = todayCurve$label),
+        yaxis = list(title = "Yield (%)")
       )
   })
 

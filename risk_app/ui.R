@@ -39,10 +39,10 @@ page_navbar(
       plotlyOutput("yield_curve_dynamics", height = "600px")
     ),
     fluidRow(
-      plotlyOutput("rolling_vol_plot", height = "350px")
+      plotlyOutput("todays_curve", height = "400px")
     ),
     fluidRow(
-      uiOutput("calculator_button")
+      plotlyOutput("rolling_vol_plot", height = "350px")
     )
   )
   ),

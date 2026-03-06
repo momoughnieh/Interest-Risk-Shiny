@@ -337,7 +337,6 @@ plAttrib <- function(spotsYesterday, spotsToday, sensYesterday) {
   return(attribPnL)
 }
 
-
 ir.long <- rateData %>%
   dplyr::group_by(maturity) %>%
   dplyr::arrange(date) %>%

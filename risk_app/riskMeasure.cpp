@@ -63,7 +63,7 @@ NumericMatrix calcRiskMeasures(NumericMatrix x) {
     x(i, 10) = delta;
     x(i, 11) = gamma;
 
-    double risk = sd * delta;
+    double risk = sd * delta * -1;
     x(i, 12) = risk;
 
   }

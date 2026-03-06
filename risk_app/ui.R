@@ -30,24 +30,34 @@ page_navbar(
           label   = "Rolling Window (Days)",
           min = 21, max = 252, value = 63, step = 21
         ),
-        actionButton(inputId = "submit_cor", label = "Submit Selection", class = "btn-success")
+        actionButton(inputId = "submit_cor", label = "Submit Selection", class = "btn-success"),
+        open = "always"
       ),
       column(width = 12,
              h4("U.S. Treasury Yield Curve Dynamics")
       ),
       fluidRow(
-        plotlyOutput("yield_curve_dynamics", height = "600px")
+        plotlyOutput("yield_curve_dynamics", height = "400px"),
+        hr(),
+        h4("Today's Par Yield Curve")
       ),
       fluidRow(
-        plotlyOutput("todays_curve", height = "400px")
+        plotlyOutput("todays_curve", height = "400px"),
+        hr(),
+        h4("Historical Risk Overview")
       ),
       fluidRow(
-        plotlyOutput("rolling_vol_plot", height = "350px")
+        plotlyOutput("riskPlot", height = "400px"),
+        hr(),
+        h4("Rolling Volatility Plot")
+      ),
+      fluidRow(
+        plotlyOutput("rolling_vol_plot", height = "400px")
       )
     )
   ),
   nav_panel(
-    title = "Portfolio Selection",
+    title = "Portfolio Sensitivity & PnL",
     layout_sidebar(
       sidebar = sidebar(
         numericInput(inputId = "face_value", label = "Face Value ($)", value = 100000),
@@ -85,18 +95,13 @@ page_navbar(
         column(width = 6,
                gt_output(outputId = "pnl_by_instrument"))
       ),
-      fluidRow(
-        column(width = 1),
-        column(width = 10,
-               hr(),
-               plotlyOutput("risk_plot", height = "500px")),
-        column(width = 1)
-      ))
+    ),
   ),
   nav_panel(
     title = "Co-Dynamics",
     layout_sidebar(
       sidebar = sidebar(
+        h4("Select Correlation Matrix Parameters"),
         checkboxGroupInput(
           inputId  = "corr_selection",
           label    = "Maturity (Years)",
@@ -111,15 +116,19 @@ page_navbar(
           min = "1992-01-01",
           max = Sys.Date()
         ),
-        actionButton(inputId = "submit_corr", label = "Submit Selection", class = "btn-success")
+        actionButton(inputId = "submit_corr", label = "Submit Selection", class = "btn-success"),
+        open = "always"
       ),
       column(width = 12,
              h4("Co-Dynamics")
       ),
       fluidRow(
-        gt_output("corr_table")
+        h4("Yield Correlation Matrix"),
+        gt_output("corr_table"),
+        hr()
       ),
       fluidRow(
+        h4("Par Yield Spreads"),
         plotlyOutput("spread_plot")
       ),
       fluidRow(

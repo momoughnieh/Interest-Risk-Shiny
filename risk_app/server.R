@@ -382,7 +382,7 @@ function(input, output, session) {
 
     pnlInstrumentTable %>%
       gt() %>%
-      tab_header(title = "Actual vs. Attributed PnL", subtitle = "For the total portfolio") %>%
+      tab_header(title = "Actual vs. Attributed PnL", subtitle = "Based on prior day sensitivities") %>%
       tab_style(style = cell_borders(sides = "all", color = "black"),
                 locations = cells_body())
 
@@ -608,5 +608,24 @@ function(input, output, session) {
         yaxis = list(title = "Difference in Rate (%)")
       )
   })
+
+  output$riskPlot <- renderPlotly({
+
+    riskData %>%
+      plotly::plot_ly(
+        x = ~ date,
+        y = ~ risk,
+        type = "scatter",
+        mode = "lines",
+        name = ~as.factor(maturity)
+       ) %>%
+      plotly::layout(
+        title = list(text = "Risk Over Time (DV01 * Rolling SD)"),
+        xaxis = list(title = "Date"),
+        yaxis = list(title = "Risk ($)")
+      )
+
+  })
+
 
 }

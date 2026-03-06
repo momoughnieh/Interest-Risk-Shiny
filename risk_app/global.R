@@ -305,8 +305,6 @@ plAttrib <- function(spotsYesterday, spotsToday, sensYesterday) {
 }
 
 
-
-# Step 1：ret = price - lag(price)
 ir.long <- rateData %>%
   dplyr::group_by(maturity) %>%
   dplyr::arrange(date) %>%

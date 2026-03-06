@@ -571,4 +571,42 @@ function(input, output, session) {
   }) %>%
     bindEvent(input$submit_corr)
 
+  output$spread_plot <- renderPlotly ({
+    spreadPlot <- spreadData %>%
+      dplyr::select(-butterflySpread) %>%
+      dplyr::arrange(date)
+    plotly::plot_ly(
+      spreadPlot,
+      x = ~ date,
+      y = ~ steepSpread *100,
+      type = "scatter",
+      mode = "lines",
+      line = list(color = "orange", width = 1.2)
+      ) %>%
+    plotly::layout(
+        title = ("Curve Steepness Over Time: 30yr  - 1yr"),
+        xaxis = list(title = "Date", type = "date"),
+        yaxis = list(title = "Spread (bps)")
+      )
+  })
+
+  output$spread_plot_butterfly <- renderPlotly ({
+    spreadPlotButterfly <- spreadData %>%
+      dplyr::select(-steepSpread) %>%
+      dplyr::arrange(date)
+    plotly::plot_ly(
+      spreadPlotButterfly,
+      x = ~ date,
+      y = ~ butterflySpread *100,
+      type = "scatter",
+      mode = "lines",
+      line = list(color = "blue", width = 1.2)
+    ) %>%
+      plotly::layout(
+        title = ("Butterfly Spread Over Time: (-2yr) + 2x10yr - 30yr"),
+        xaxis = list(title = "Date", type = "date"),
+        yaxis = list(title = "Spread (bps)")
+      )
+  })
+
 }

@@ -35,16 +35,16 @@ page_navbar(
       column(width = 12,
              h4("U.S. Treasury Yield Curve Dynamics")
       ),
-    fluidRow(
-      plotlyOutput("yield_curve_dynamics", height = "600px")
-    ),
-    fluidRow(
-      plotlyOutput("todays_curve", height = "400px")
-    ),
-    fluidRow(
-      plotlyOutput("rolling_vol_plot", height = "350px")
+      fluidRow(
+        plotlyOutput("yield_curve_dynamics", height = "600px")
+      ),
+      fluidRow(
+        plotlyOutput("todays_curve", height = "400px")
+      ),
+      fluidRow(
+        plotlyOutput("rolling_vol_plot", height = "350px")
+      )
     )
-  )
   ),
   nav_panel(
     title = "Portfolio Selection",
@@ -68,6 +68,13 @@ page_navbar(
         column(width = 1),
         column(width = 10,
                hr(),
+               plotlyOutput("portfolio_pie", height = "350px")),
+        column(width = 1)
+      ),
+      fluidRow(
+        column(width = 1),
+        column(width = 10,
+               hr(),
                gt_output(outputId = "exposure_table")),
         column(width = 1)
       ),
@@ -81,7 +88,8 @@ page_navbar(
       fluidRow(
         column(width = 1),
         column(width = 10,
-               plotlyOutput("portfolio_pie", height = "350px")),
+               hr(),
+               plotlyOutput("risk_plot", height = "500px")),
         column(width = 1)
       ))
   ),
@@ -106,13 +114,17 @@ page_navbar(
         actionButton(inputId = "submit_corr", label = "Submit Selection", class = "btn-success")
       ),
       column(width = 12,
-           h4("Co-Dynamics")
-           ),
+             h4("Co-Dynamics")
+      ),
       fluidRow(
         gt_output("corr_table")
+      ),
+      fluidRow(
+        plotlyOutput("spread_plot")
+      ),
+      fluidRow(
+        plotlyOutput("spread_plot_butterfly")
+      )
     )
   )
-  )
 )
-
-

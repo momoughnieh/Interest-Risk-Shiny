@@ -1,0 +1,36 @@
+name: Import Economic Data morning 8am
+
+on:
+  schedule:
+    - cron: "0 15 * * *" #Runs on the 0 minute on the 15 hour each day
+
+
+jobs:
+  import-data:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Initialize R
+        uses: r-lib/actions/setup-r@v2
+
+      - name: Install Needed Packages
+        uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          packages: |
+            any::tidyquant
+            any::dplyr
+            any::arrow
+
+      - name: Import data
+        run: Rscript scripts/update_rates.R
+
+      - name: Commit updated data
+        run: |
+          git config --local user.email "actions@github.com"
+          git config --local user.name "Github Actions"
+          git add data/rates.feather
+          git commit -m "Daily rate data update" || echo "No changes"
+          git push || echo "No changes to commit"

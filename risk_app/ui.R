@@ -109,10 +109,7 @@ page_navbar(
            h4("Co-Dynamics")
            ),
       fluidRow(
-        gt_output("corr_table"),
-        plotOutput("corrPlot"),
-        plotOutput("screePlot"),
-        plotOutput("loadingsPlot")
+        gt_output("corr_table")
     )
   )
   )

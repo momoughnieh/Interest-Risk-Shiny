@@ -13,10 +13,10 @@ library(factoextra)
 library(recipes)
 library(tidyverse)
 library(DT)
-library(slider)
 library(gt)
 library(Rcpp)
 sourceCpp('riskMeasure.cpp')
+sourceCpp('spread.cpp')
 
 
 # Goal: Figure out how to pull data through github actions, and then read data in app.
@@ -58,6 +58,23 @@ riskData <- calcRiskMeasures(as.matrix(alteredDat)) %>%
   as_tibble(.) %>%
   dplyr::mutate(date = dates) %>%
   dplyr::select(date, everything())
+
+wideData <- rateData %>%
+  dplyr::filter(maturity %in% c(1,2,10,30)) %>%
+  dplyr::mutate(maturity = case_when(
+    maturity == 1 ~ "1Y",
+    maturity == 2 ~ "2Y",
+    maturity == 10 ~ "10Y",
+    maturity == 30 ~ "30Y"
+  )) %>%
+  tidyr::pivot_wider(names_from = maturity, values_from = rate) %>%
+  dplyr::mutate(steepSpread = 1,
+                butterflySpread = 1)
+
+spreadData <- calcSpreads(as.matrix(wideData %>% dplyr::mutate(date = as.numeric(date)))) %>%
+  dplyr::as_tibble(.) %>%
+  dplyr::mutate(date = as.Date(date)) %>%
+  dplyr::select(date, steepSpread, butterflySpread)
 
 
 ## Spline Curve function -- to be used on par yields to bootstrap zero curve ##
